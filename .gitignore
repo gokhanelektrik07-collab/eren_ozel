@@ -1,22 +1,121 @@
-### AL ###
-#Template for AL projects for Dynamics 365 Business Central
-#launch.json folder
-.vscode/
-#Cache folder
-.alcache/
-#Symbols folder
-.alpackages/
-#Snapshots folder
-.snapshots/
-#Testing Output folder
-.output/
-#Extension App-file
-*.app
-#Rapid Application Development File
-rad.json
-#Translation Base-file
-*.g.xlf
-#License-file
-*.flf
-#Test results file
-TestResults.xml
+// ==UserScript==
+// @name         EREN Hybrid Client v10.2 - Renkli Pelerin & FPS Boost
+// @match        https://bloxd.io/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let pelerinDurumu = true;
+
+    // --- 1. FPS BOOST OPTİMİZASYONLARI ---
+    const fpsStyle = document.createElement("style");
+    fpsStyle.innerHTML = `
+        canvas {
+            image-rendering: pixelated !important;
+            image-rendering: crisp-edges !important;
+        }
+        * {
+            text-shadow: none !important;
+            box-shadow: none !important;
+        }
+    `;
+    document.head.appendChild(fpsStyle);
+
+    // --- 2. PELERİN TASARIMI (EREN YAZISI & ÖZEL RENKLER) ---
+    function getCapeTexture() {
+        const cvs = document.createElement("canvas");
+        const cx = cvs.getContext("2d");
+        cvs.width = 40; cvs.height = 100;
+
+        // İstenen Renk Blokları
+        cx.fillStyle = "blue";      cx.fillRect(0, 0, 20, 50);   // Sol Üst: Mavi
+        cx.fillStyle = "cyan";      cx.fillRect(20, 0, 20, 50);  // Sağ Üst: Turkuaz
+        cx.fillStyle = "red";       cx.fillRect(0, 50, 20, 50);  // Sol Alt: Kırmızı
+        cx.fillStyle = "darkblue";  cx.fillRect(20, 50, 20, 50); // Sağ Alt: Mavi (Koyu)
+
+        // EREN Yazısı (Kırmızı)
+        cx.fillStyle = "red";
+        cx.font = "bold 10px Arial";
+        cx.textAlign = "center";
+        cx.fillText("EREN", 20, 15);
+
+        // Orta Simge (Şimşek Efekti)
+        cx.fillStyle = "#FFD700"; cx.fillRect(12, 35, 16, 16);
+        cx.fillStyle = "white"; cx.font = "14px Arial"; cx.fillText("⚡", 20, 48);
+
+        return cvs.toDataURL();
+    }
+    const capeData = getCapeTexture();
+
+    // --- 3. EKRAN MONTE ---
+    const capeDiv = document.createElement("div");
+    capeDiv.id = "eren-main-cape";
+    capeDiv.style = `
+        position: fixed;
+        left: 50%;
+        top: 52.5%;
+        width: 45px;
+        height: 95px;
+        pointer-events: none;
+        z-index: 1;
+        perspective: 600px;
+        display: none;
+        transform: translateX(-50%);
+        will-change: transform;
+    `;
+
+    const capeInner = document.createElement("div");
+    capeInner.style = `width:100%; height:100%; background:url(${capeData}); background-size:100% 100%; transform-origin:top; transition: transform 0.1s ease-out;`;
+
+    capeDiv.appendChild(capeInner);
+    document.body.appendChild(capeDiv);
+
+    // --- 4. OYUNCU SENKRONİZASYONU ---
+    function applyToEREN() {
+        if(!pelerinDurumu) return;
+        document.querySelectorAll(".player-nick").forEach(nick => {
+            if (nick.innerText.includes("EREN_")) {
+                if (!nick.parentElement.querySelector(".eren-cape-sync")) {
+                    const rCape = document.createElement("div");
+                    rCape.className = "eren-cape-sync";
+                    rCape.style = `position:absolute; width:1em; height:2em; background:url(${capeData}); background-size:100% 100%; top:1.6em; left:50%; transform:translateX(-50%) rotateX(15deg); z-index:-1; will-change: transform;`;
+                    nick.parentElement.appendChild(rCape);
+                }
+            }
+        });
+    }
+
+    // --- 5. HAREKET VE TUŞLAR ---
+    let speed = 0;
+    window.addEventListener('keydown', (e) => {
+        if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) speed = 12;
+        if(e.code === 'Space') speed = 25;
+        if(e.code === 'ShiftRight') pelerinDurumu = !pelerinDurumu;
+    });
+    window.addEventListener('keyup', () => speed = 0);
+
+    let lastTime = 0;
+    function loop(currentTime) {
+        if(pelerinDurumu) {
+            capeDiv.style.display = "block";
+            let wave = Math.sin(currentTime / 200) * 4;
+            capeInner.style.transform = `rotateX(${10 + speed + wave}deg)`;
+
+            if (currentTime - lastTime > 1000) {
+                applyToEREN();
+                lastTime = currentTime;
+            }
+        } else {
+            if(capeDiv.style.display !== "none") {
+                capeDiv.style.display = "none";
+                document.querySelectorAll(".eren-cape-sync").forEach(c => c.remove());
+            }
+        }
+        requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+    console.log("EREN Client: Renkler ve Yazı Güncellendi! 🚀");
+})();
