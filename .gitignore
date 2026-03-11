@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         EREN Hybrid Client v10.2 - Renkli Pelerin & FPS Boost
+// @name         EREN Custom Cape Client v11.1
 // @match        https://bloxd.io/*
 // @grant        none
 // ==/UserScript==
@@ -7,115 +7,135 @@
 (function() {
     'use strict';
 
-    let pelerinDurumu = true;
+    let state = {
+        pelerinAcik: true,
+        menuAcik: false,
+        genislik: 45,
+        yukseklik: 95,
+        incelik: 600,
+        hiz: 0,
+        currentRotation: 10
+    };
 
-    // --- 1. FPS BOOST OPTİMİZASYONLARI ---
-    const fpsStyle = document.createElement("style");
-    fpsStyle.innerHTML = `
-        canvas {
-            image-rendering: pixelated !important;
-            image-rendering: crisp-edges !important;
-        }
-        * {
-            text-shadow: none !important;
-            box-shadow: none !important;
-        }
-    `;
-    document.head.appendChild(fpsStyle);
-
-    // --- 2. PELERİN TASARIMI (EREN YAZISI & ÖZEL RENKLER) ---
-    function getCapeTexture() {
+    // --- 1. PELERİN GÖRSELİ ÇİZİCİ (YAZI: EREN) ---
+    function getCapeData() {
         const cvs = document.createElement("canvas");
         const cx = cvs.getContext("2d");
         cvs.width = 40; cvs.height = 100;
 
-        // İstenen Renk Blokları
-        cx.fillStyle = "blue";      cx.fillRect(0, 0, 20, 50);   // Sol Üst: Mavi
-        cx.fillStyle = "cyan";      cx.fillRect(20, 0, 20, 50);  // Sağ Üst: Turkuaz
-        cx.fillStyle = "red";       cx.fillRect(0, 50, 20, 50);  // Sol Alt: Kırmızı
-        cx.fillStyle = "darkblue";  cx.fillRect(20, 50, 20, 50); // Sağ Alt: Mavi (Koyu)
+        // Arka Plan Renkleri
+        cx.fillStyle = "blue";  cx.fillRect(0, 0, 20, 50);
+        cx.fillStyle = "white"; cx.fillRect(20, 0, 20, 50);
+        cx.fillStyle = "cyan";  cx.fillRect(0, 50, 20, 50);
+        cx.fillStyle = "red";   cx.fillRect(20, 50, 20, 50);
 
-        // EREN Yazısı (Kırmızı)
-        cx.fillStyle = "red";
-        cx.font = "bold 10px Arial";
+        // YAZI DEĞİŞİKLİĞİ: EREN
+        cx.fillStyle = "yellow"; // Daha belirgin olması için sarı yaptım
+        cx.font = "bold 9px Arial"; // 4 harf olduğu için fontu biraz küçülttüm
         cx.textAlign = "center";
         cx.fillText("EREN", 20, 15);
 
-        // Orta Simge (Şimşek Efekti)
+        // Sarı Şimşek Logosu
         cx.fillStyle = "#FFD700"; cx.fillRect(12, 35, 16, 16);
         cx.fillStyle = "white"; cx.font = "14px Arial"; cx.fillText("⚡", 20, 48);
 
         return cvs.toDataURL();
     }
-    const capeData = getCapeTexture();
+    const capeImg = getCapeData();
 
-    // --- 3. EKRAN MONTE ---
-    const capeDiv = document.createElement("div");
-    capeDiv.id = "eren-main-cape";
-    capeDiv.style = `
-        position: fixed;
-        left: 50%;
-        top: 52.5%;
-        width: 45px;
-        height: 95px;
-        pointer-events: none;
-        z-index: 1;
-        perspective: 600px;
-        display: none;
-        transform: translateX(-50%);
-        will-change: transform;
+    // --- 2. ARAYÜZ (GUI) ---
+    const menuDiv = document.createElement("div");
+    menuDiv.style = `
+        position: fixed; top: 50%; left: 85%; transform: translate(-50%, -50%);
+        width: 220px; background: rgba(10, 10, 10, 0.95); border: 2px solid #FFD700;
+        border-radius: 12px; padding: 15px; z-index: 100000; display: none;
+        color: white; font-family: 'Segoe UI', sans-serif; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
     `;
+    menuDiv.innerHTML = `
+        <div style="text-align:center; margin-bottom:10px;">
+            <span style="color:#FFD700; font-weight:bold;">EREN SETTINGS</span>
+        </div>
+        <div style="font-size:11px; color:#aaa; margin-bottom:10px; text-align:center;">
+            Kapat: <span style="color:#fff">Sağ Shift</span> | Ayar: <span style="color:#fff">*</span>
+        </div>
+        <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+        <label style="font-size:12px;">Genişlik: <b id="wV">45</b></label>
+        <input type="range" id="wS" min="20" max="80" value="45" style="width:100%; accent-color:#FFD700;">
+        <br><br>
+        <label style="font-size:12px;">Yükseklik: <b id="hV">95</b></label>
+        <input type="range" id="hS" min="50" max="150" value="95" style="width:100%; accent-color:#FFD700;">
+        <br><br>
+        <label style="font-size:12px;">İncelik: <b id="dV">600</b></label>
+        <input type="range" id="dS" min="200" max="1200" value="600" style="width:100%; accent-color:#FFD700;">
+    `;
+    document.body.appendChild(menuDiv);
 
-    const capeInner = document.createElement("div");
-    capeInner.style = `width:100%; height:100%; background:url(${capeData}); background-size:100% 100%; transform-origin:top; transition: transform 0.1s ease-out;`;
+    // --- 3. PELERİN ELEMENTLERİ ---
+    const capeContainer = document.createElement("div");
+    capeContainer.style = `position: fixed; left: 50%; top: 52.5%; pointer-events: none; z-index: 1; transform: translateX(-50%);`;
+    const capeBody = document.createElement("div");
+    capeBody.style = `width:100%; height:100%; background:url(${capeImg}); background-size:100% 100%; transform-origin:top; transition: transform 0.1s ease-out;`;
+    capeContainer.appendChild(capeBody);
+    document.body.appendChild(capeContainer);
 
-    capeDiv.appendChild(capeInner);
-    document.body.appendChild(capeDiv);
-
-    // --- 4. OYUNCU SENKRONİZASYONU ---
-    function applyToEREN() {
-        if(!pelerinDurumu) return;
-        document.querySelectorAll(".player-nick").forEach(nick => {
-            if (nick.innerText.includes("EREN_")) {
-                if (!nick.parentElement.querySelector(".eren-cape-sync")) {
-                    const rCape = document.createElement("div");
-                    rCape.className = "eren-cape-sync";
-                    rCape.style = `position:absolute; width:1em; height:2em; background:url(${capeData}); background-size:100% 100%; top:1.6em; left:50%; transform:translateX(-50%) rotateX(15deg); z-index:-1; will-change: transform;`;
-                    nick.parentElement.appendChild(rCape);
-                }
-            }
-        });
-    }
-
-    // --- 5. HAREKET VE TUŞLAR ---
-    let speed = 0;
+    // --- 4. KONTROLLER ---
     window.addEventListener('keydown', (e) => {
-        if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) speed = 12;
-        if(e.code === 'Space') speed = 25;
-        if(e.code === 'ShiftRight') pelerinDurumu = !pelerinDurumu;
+        if(e.key === '*' || e.code === 'NumpadMultiply') {
+            state.menuAcik = !state.menuAcik;
+            menuDiv.style.display = state.menuAcik ? "block" : "none";
+        }
+        if(e.code === 'ShiftRight') {
+            state.pelerinAcik = !state.pelerinAcik;
+        }
+        if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) state.hiz = 15;
+        if(e.code === 'Space') state.hiz = 22;
     });
-    window.addEventListener('keyup', () => speed = 0);
 
-    let lastTime = 0;
-    function loop(currentTime) {
-        if(pelerinDurumu) {
-            capeDiv.style.display = "block";
-            let wave = Math.sin(currentTime / 200) * 4;
-            capeInner.style.transform = `rotateX(${10 + speed + wave}deg)`;
+    window.addEventListener('keyup', (e) => {
+        if(['KeyW','KeyS','KeyA','KeyD', 'Space'].includes(e.code)) state.hiz = 0;
+    });
 
-            if (currentTime - lastTime > 1000) {
-                applyToEREN();
-                lastTime = currentTime;
-            }
+    const updateGUI = () => {
+        state.genislik = document.getElementById("wS").value;
+        state.yukseklik = document.getElementById("hS").value;
+        state.incelik = document.getElementById("dS").value;
+        document.getElementById("wV").innerText = state.genislik;
+        document.getElementById("hV").innerText = state.yukseklik;
+        document.getElementById("dV").innerText = state.incelik;
+        capeContainer.style.width = state.genislik + "px";
+        capeContainer.style.height = state.yukseklik + "px";
+        capeContainer.style.perspective = state.incelik + "px";
+    };
+
+    document.getElementById("wS").oninput = updateGUI;
+    document.getElementById("hS").oninput = updateGUI;
+    document.getElementById("dS").oninput = updateGUI;
+
+    // --- 5. ANA DÖNGÜ ---
+    function loop(t) {
+        if(state.pelerinAcik) {
+            capeContainer.style.display = "block";
+            let wave = Math.sin(t / 200) * 5;
+            let target = 10 + state.hiz + wave;
+            state.currentRotation += (target - state.currentRotation) * 0.1;
+            capeBody.style.transform = `rotateX(${Math.min(state.currentRotation, 45)}deg)`;
+
+            // Senkronizasyon: Adında "EREN" geçenleri pelerinli gör (opsiyonel)
+            document.querySelectorAll(".player-nick").forEach(nick => {
+                if ((nick.innerText.includes("EREN") || nick.innerText.includes("ELT_")) && !nick.querySelector(".elt-cape")) {
+                    let c = document.createElement("div");
+                    c.className = "elt-cape";
+                    c.style = `position:absolute; width:15px; height:30px; background:url(${capeImg}); background-size:100% 100%; top:25px; left:50%; transform:translateX(-50%) rotateX(15deg); z-index:-1;`;
+                    nick.appendChild(c);
+                }
+            });
         } else {
-            if(capeDiv.style.display !== "none") {
-                capeDiv.style.display = "none";
-                document.querySelectorAll(".eren-cape-sync").forEach(c => c.remove());
-            }
+            capeContainer.style.display = "none";
+            document.querySelectorAll(".elt-cape").forEach(c => c.remove());
         }
         requestAnimationFrame(loop);
     }
 
+    updateGUI();
     requestAnimationFrame(loop);
-    console.log("EREN Client: Renkler ve Yazı Güncellendi! 🚀");
 })();
